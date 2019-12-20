@@ -3,3 +3,6 @@
 
 1. pipenv install
 2. pipenv run python gethongbao.py
+
+# 下载
+  下载最新版本：[release page]
