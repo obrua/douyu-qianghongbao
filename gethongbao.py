@@ -20,7 +20,7 @@ from basemodule.config import Config, BASE_DIR
 
 start_unixtime = time.time()
 
-logger.level("HONGBAO", no=50, color="<red>", icon="🧧")
+logger.level("HONGBAO", no=50, color="<red>", icon="🧧") 
 hongbao_logfile = os.environ.get('HONGBAO_LOGFILE') or 'hongbao.log'
 logger.log("HONGBAO", '红包的记录文件: {}', os.path.join(BASE_DIR, hongbao_logfile))
 logger.log("HONGBAO", '格式: unix时间 房间名 房间号 礼物名')
