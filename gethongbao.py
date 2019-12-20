@@ -333,6 +333,8 @@ def get_cookie():
     cookie_douyu = loginByQrcode.get_cookie_from_txt()
     if cookie_douyu and loginByQrcode.test_get_csrf_cookie(cookie_douyu):
         logger.success('cookie有效.')
+        # 重新从文件取
+        cookie_douyu = loginByQrcode.get_cookie_from_txt()
         return cookie_douyu
     else:
         # 二维码登录
@@ -341,17 +343,15 @@ def get_cookie():
         return get_cookie()
 
 
-
-
 if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
 
     cookie_douyu = get_cookie()
-
     acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
     logger.success(f'账号: {acf_nickname}({acf_uid})')
+    os.system(f"title 账号: {acf_nickname}({acf_uid}) - Powered by obrua.com")
 
     hongbao_queue = queue.Queue()
     stock_hongbao = []
