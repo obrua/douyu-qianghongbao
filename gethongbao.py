@@ -31,6 +31,8 @@ logger.add(os.path.join(BASE_DIR, hongbao_logfile),
            rotation="50 MB",
            encoding='utf-8')
 
+logger.log("HONGBAO", '抢到礼物立即自动赠送[{}] (火箭、飞机除外)', '开启' if Config.AUTO_SEND else '关闭')
+
 bEXIT = False
 
 
@@ -100,6 +102,8 @@ class HongBao():
                     self.updata(item)
                     logger.log("HONGBAO", " {} {} {} {}",
                         item['time'], item['rid'], item['nn'], item['prpn'])
+                    if Config.AUTO_SEND:
+                        self.songliwu(item)
                     # print(item['rid'],item['nn'],item['prpn'])
         except Exception as e:
             logger.exception(f'_get_hongbaores {e}')
@@ -142,6 +146,36 @@ class HongBao():
             return -1
         else:
             return 99
+
+    def songliwu(self, item):
+        try:
+            prid={'666':978,'大气':975,'办卡':974}
+            url='https://www.douyu.com/japi/prop/donate/mainsite/v1'
+            header={'user-agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
+                    'content-type':'application/x-www-form-urlencoded',
+                    'referer': 'https://www.douyu.com/%s'%item['rid']}
+            
+            i = item['prpn']
+            if i not in prid:
+                pass
+            else:
+                payload='propId=%s&propCount=1&roomId=%s&bizExt=\{"yzxq":\{\}\}'%(prid[i],item['rid'])
+                res = requests.post(url, payload, headers=header, cookies=self.__cookie_douyu).json()
+                if res['error']==0:
+                    logger.success('{} 自动赠送成功！', i)
+                    logger.log("HONGBAO", " {} {} {} {} 自动赠送成功！",
+                        item['time'], item['rid'], item['nn'], item['prpn'])
+
+                else:
+                    logger.error('{} 自动赠送错误：{}', i, res['msg'])
+
+        except Exception as e:
+            logger.exception('songliwu: {}'.format(e))
+        finally:
+            pass
+
+
+
 
     def updata(self, item):
         try:
@@ -233,7 +267,6 @@ class QiangHongBao():
                     timestmap = int(time.time())
                     #logger.info('qiang {} {}', timestmap, item['stmap'])
                     if timestmap >= item['stmap']:
-                        time.sleep(0.1)
                         state = self.grab_prp(item=item)
                         # print('请求时间为%s'%timestmap,state)
                         logger.info(
