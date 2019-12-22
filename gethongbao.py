@@ -1,3 +1,4 @@
+# cython: language_level=3
 import sys
 import os
 import signal
@@ -14,31 +15,11 @@ import json
 import re
 import queue
 from basemodule.logger import logger
-from douyu_login import loginByQrcode
-from douyu_login import utils as login_utils
 from basemodule.config import Config, BASE_DIR
+from douyu_login import utils as login_utils
+from douyu_login import loginByQrcode
 
 start_unixtime = time.time()
-
-logger.level("HONGBAO", no=50, color="<red>", icon="🧧") 
-hongbao_logfile = os.environ.get('HONGBAO_LOGFILE') or 'hongbao.log'
-logger.log("HONGBAO", '红包的记录文件: {}', os.path.join(BASE_DIR, hongbao_logfile))
-logger.log("HONGBAO", '格式: unix时间 房间名 房间号 礼物名')
-logger.add(os.path.join(BASE_DIR, hongbao_logfile),
-           format="<g>{time}</> - <lvl>{message}</>",
-           level="HONGBAO",
-           enqueue=True,
-           rotation="50 MB",
-           encoding='utf-8')
-
-bEXIT = False
-
-
-def quit(signum, frame):
-    global bEXIT
-    logger.warning('消息获取: 强制退出')
-    bEXIT = True
-
 
 class HongBao():
     def __init__(self, _queue, cookie_douyu, stock_hongbao, got_hongbao, qiang):
@@ -100,6 +81,8 @@ class HongBao():
                     self.updata(item)
                     logger.log("HONGBAO", " {} {} {} {}",
                         item['time'], item['rid'], item['nn'], item['prpn'])
+                    if Config.AUTO_SEND:
+                        self.songliwu(item)
                     # print(item['rid'],item['nn'],item['prpn'])
         except Exception as e:
             logger.exception(f'_get_hongbaores {e}')
@@ -142,6 +125,36 @@ class HongBao():
             return -1
         else:
             return 99
+
+    def songliwu(self, item):
+        try:
+            prid={'666':978,'大气':975,'办卡':974}
+            url='https://www.douyu.com/japi/prop/donate/mainsite/v1'
+            header={'user-agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
+                    'content-type':'application/x-www-form-urlencoded',
+                    'referer': 'https://www.douyu.com/%s'%item['rid']}
+            
+            i = item['prpn']
+            if i not in prid:
+                pass
+            else:
+                payload='propId=%s&propCount=1&roomId=%s&bizExt=\{"yzxq":\{\}\}'%(prid[i],item['rid'])
+                res = requests.post(url, payload, headers=header, cookies=self.__cookie_douyu).json()
+                if res['error']==0:
+                    logger.success('{} 自动赠送成功！', i)
+                    logger.log("HONGBAO", " {} {} {} {} 自动赠送成功！",
+                        item['time'], item['rid'], item['nn'], item['prpn'])
+
+                else:
+                    logger.error('{} 自动赠送错误：{}', i, res['msg'])
+
+        except Exception as e:
+            logger.exception('songliwu: {}'.format(e))
+        finally:
+            pass
+
+
+
 
     def updata(self, item):
         try:
@@ -233,7 +246,6 @@ class QiangHongBao():
                     timestmap = int(time.time())
                     #logger.info('qiang {} {}', timestmap, item['stmap'])
                     if timestmap >= item['stmap']:
-                        time.sleep(0.1)
                         state = self.grab_prp(item=item)
                         # print('请求时间为%s'%timestmap,state)
                         logger.info(
@@ -342,78 +354,37 @@ def get_cookie():
             logger.success('二维码登录失败, 重试.')
         return get_cookie()
 
+def verControl():
 
-if __name__ == '__main__':
+    version = '1.0.1.0'
 
-    signal.signal(signal.SIGINT, quit)
-    signal.signal(signal.SIGTERM, quit)
+    print('=============================================================')
+    print('            此工具由obrua.com提供 by 胖头鱼的机器人 && 小丑')
+    print('                 发布地址: https://www.obrua.com')
+    print(f'                  当前版本: v{version}')
+    print('=============================================================')
 
-    cookie_douyu = get_cookie()
-    acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
-    logger.success(f'账号: {acf_nickname}({acf_uid})')
-    os.system(f"title 账号: {acf_nickname}({acf_uid}) - Powered by obrua.com")
+    url = 'https://www.obrua.com/913boxAssistant/version'
+    headers = {
+        'Accept-Language': 'zh-CN',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.81 Safari/537.36'
+    }
+    redata = {}
+    try:
+        req = requests.get(url, headers=headers)
+        redata = req.json()
+        req.close
+    finally:
+        pass
 
-    hongbao_queue = queue.Queue()
-    stock_hongbao = []
-    got_hongbao = set()
-    
+    bcontinue = True
+    if 'qianghongbao' in redata:
+        if version < redata['qianghongbao']:
+            bcontinue = False
+            print('                  最新版本: v{}'.format(redata['qianghongbao']))
+            print('            请更新: https://www.obrua.com')
+            
+    os.system("pause")
+    if not bcontinue:
+        sys.exit()
 
-    qiang_service = QiangHongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu, threadNum=6)
-    hongbao_service = HongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu,
-                      stock_hongbao=stock_hongbao, got_hongbao=got_hongbao, qiang=qiang_service)
-    while True:
-
-        logger.info('服务健康检查...')
-
-        nowThreadsName = []  # 用来保存当前线程名称
-        for i in threading.enumerate():
-            nowThreadsName.append(i.getName())  # 保存当前线程名称
-
-        if  'HongBao-do' not in nowThreadsName:
-            logger.error('红包监控线程丢失')
-            if hongbao_service:
-                hongbao_service.stop()
-                logger.error('停止服务 准备重启')
-                time.sleep(10)
-
-        if  'HongBao-qiang' not in nowThreadsName:
-            logger.error('抢红包线程丢失')
-            if qiang_service:
-                qiang_service.stop()
-                logger.error('停止服务 准备重启')
-                time.sleep(10)
-
-
-        if qiang_service and qiang_service.get_done():
-            # 抢服务中断
-            logger.warning('抢服务中断 重启')
-            qiang_service = None
-            qiang_service = QiangHongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu, threadNum=6)
-        elif not qiang_service:
-            # 抢服务不存在
-            logger.warning('抢服务丢失 重启')
-            qiang_service = QiangHongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu, threadNum=6)
-
-        if hongbao_service and hongbao_service.get_done():
-            # 红包服务中断
-            logger.warning('红包服务中断 重启')
-            hongbao_service = None
-            hongbao_service = HongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu,
-                      stock_hongbao=stock_hongbao, got_hongbao=got_hongbao, qiang=qiang_service)
-        elif not hongbao_service:
-            # 红包服务中断
-            logger.warning('红包服务丢失 重启')
-            hongbao_service = HongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu,
-                      stock_hongbao=stock_hongbao, got_hongbao=got_hongbao, qiang=qiang_service)
-
-        if bEXIT:
-            if hongbao_service:
-                hongbao_service.stop()
-            if qiang_service:
-                qiang_service.stop()
-            break
-
-        for i in range(12*5):
-            if bEXIT:
-                break
-            time.sleep(5)
