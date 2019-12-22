@@ -8,7 +8,7 @@ import re
 # from PIL import Image
 from basemodule.config import Config, BASE_DIR
 from basemodule.logger import logger
-from . import utils
+import douyu_login.utils as utils
 import platform
 
 cookie_file = os.path.join(BASE_DIR, 'cookie_douyu.txt')
