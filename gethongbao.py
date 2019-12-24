@@ -189,6 +189,7 @@ class QiangHongBao():
         self.__done = False
         self.__cookie_douyu = cookie_douyu
         self.__qianglist = []
+        self.__followlist = []
         self.threadpool_doqiang = ThreadPoolExecutor(threadNum)
 
         self._init_run()
@@ -203,9 +204,25 @@ class QiangHongBao():
 
     def _init_run(self):
         """启动监控红包&红包结果监控线程"""
+        self.__followlist=self._get_followlist()
         qiang_hongbao = Thread(target=self._qiang_hongbao,
                                name="HongBao-qiang")
         qiang_hongbao.start()
+
+    def _get_followlist(self):
+        url='https://www.douyu.com/wgapi/livenc/liveweb/follow/list?sort=0&cid1=0'
+        __followlist=[]
+        try:
+            data=requests.get(url,cookies=self.__cookie_douyu).json()
+            #print(data)
+            if data['error']==0:
+                followlist=data['data']['list']
+                for item in followlist:
+                    __followlist.append(item['room_id'])
+                logger.info('获取关注列表成功 关注主播数量为{}个',len(__followlist))
+                return __followlist
+        except Exception as e:
+            logger.exception(f'get_followlist {e}')
 
     def _qiang_hongbao(self):
         while True:
@@ -259,7 +276,10 @@ class QiangHongBao():
                             # self.__stock_hongbao.remove(item['activityid'])
                             break
                     time.sleep(0.1)
-                self.quguan(roomid)
+                if roomid not in self.__followlist:
+                    self.quguan(roomid)
+                else:
+                    logger.info(f'已经关注，无需取关')
             else:
                 # print('条件：全部水友参与')
                 logger.info(f'条件为全部水友参与，无需关注')
