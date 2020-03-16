@@ -15,7 +15,8 @@ from basemodule.config import Config, BASE_DIR
 logger = loguru.logger
 logger.remove()
 
-fmt = "<g>{time}</> | <lvl>{level}</> | <c>{name}</>:<c>{line}</>:<c>{line}</>;<c>{thread.name}</> - <lvl>{message}</>"
+fmt = "<g>{time}</> | <lvl>{level}</> | <c>{name}</>:<c>{function}</>:<c>{line}</>;<c>{thread.name}</> - <lvl>{message}\n{exception}</>"""
+
 if Config.ENV == 'PRODUCTION':
     fmt = "<g>{time}</> | <lvl>{level}</> | <c>{name}</>; - <lvl>{message}</>"
 log_file_path = os.path.join(BASE_DIR,f'log/{Config.LOGURU_LOGFILE}')

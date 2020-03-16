@@ -21,5 +21,6 @@ class Config(object):
     ENV = os.environ.get('LOGURU_LEVEL') or 'PRODUCTION'
     LOGURU_LEVEL = os.environ.get('LOGURU_LEVEL') or 'INFO'
     LOGURU_LOGFILE = os.environ.get('LOGURU_LOGFILE') or 'logfile.log'
-
-    AUTO_SEND = os.environ.get('AUTO_SEND', 'false').lower() in ['true', 'on', '1']
+    
+    #AUTO_SEND = os.environ.get('AUTO_SEND', 'false').lower() in ['true', 'on', '1']
+    AUTO_SEND = os.environ.get('AUTO_SEND', 'false').lower() not in ['false', 'off', '0']

@@ -81,6 +81,16 @@ if __name__ == '__main__':
         if qiang_service and qiang_service.get_done():
             # 抢服务中断
             logger.warning('抢服务中断 重启')
+            if qiang_service.get_overcookie():
+                # 重新获取cookie
+                cookie_douyu = update_cookie()
+                if not cookie_douyu:
+                    logger.error('cookie续期失败, 请重启重新登录')
+                    break
+                    time.sleep(5)
+
+                acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
+
             qiang_service = None
             qiang_service = QiangHongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu, threadNum=6)
         elif not qiang_service:
