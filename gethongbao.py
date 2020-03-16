@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 import random
 import threading
+import ntplib
 from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 import requests
@@ -21,10 +22,19 @@ from douyu_login import loginByQrcode
 
 start_unixtime = time.time()
 
+def get_aliyuntime(offset=0.5):
+    '''获取阿里云时间'''
+    ntp_aliyun = ['ntp1.aliyun.com', 'ntp2.aliyun.com', 'ntp3.aliyun.com', 'ntp4.aliyun.com', 'ntp5.aliyun.com', 'ntp6.aliyun.com', 'ntp7.aliyun.com']
+
+    ntp_client = ntplib.NTPClient()
+    ntp_stats = ntp_client.request(random.choice(ntp_aliyun))
+    return ntp_stats.tx_time - offset
+
 class HongBao():
     def __init__(self, _queue, cookie_douyu, stock_hongbao, got_hongbao, qiang):
         self.__queue = _queue
         self.__done = False
+        self.__overcookie = False
         self.__cookie_douyu = cookie_douyu
         # list []
         self.__stock_hongbao = stock_hongbao
@@ -48,11 +58,21 @@ class HongBao():
     def get_done(self):
         return self.__done
 
+    def set_overcookie(self):
+        """设置cookie过期"""
+        self.__overcookie = True
+
+    def get_overcookie(self):
+        return self.__overcookie
+
     def _do_hongbao(self):
         while True:
 
             i_propredpacket = self._get_propredpacket()
             i_hongbaores = self._get_hongbaores()
+            if i_hongbaores == -401:
+                self.set_overcookie()
+                self.stop()
 
             logger.success('红包监控中..')
             logger.debug(f'当前已监控到的红包： {self.__stock_hongbao}')
@@ -70,6 +90,10 @@ class HongBao():
         try:
             url = 'https://www.douyu.com/japi/interactnc/web/propredpacket/get_prp_records?type_id=1'
             res = requests.get(url, cookies=self.__cookie_douyu).json()
+            if res['error']==1002:
+                logger.error(f'cookie过期 {res}')
+                return -401
+
             data = res['data']['list']
             logger.trace(data)
             for item in data:
@@ -80,7 +104,7 @@ class HongBao():
                     logger.info(f'新抢到红包：{jsonStr}')
                     self.updata(item)
                     logger.log("HONGBAO", " {} {} {} {}",
-                        item['time'], item['rid'], item['nn'], item['prpn'])
+                               item['time'], item['rid'], item['nn'], item['prpn'])
                     if Config.AUTO_SEND:
                         self.songliwu(item)
                     # print(item['rid'],item['nn'],item['prpn'])
@@ -128,22 +152,24 @@ class HongBao():
 
     def songliwu(self, item):
         try:
-            prid={'666':978,'大气':975,'办卡':974}
-            url='https://www.douyu.com/japi/prop/donate/mainsite/v1'
-            header={'user-agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
-                    'content-type':'application/x-www-form-urlencoded',
-                    'referer': 'https://www.douyu.com/%s'%item['rid']}
-            
+            prid = {'666': 978, '大气': 975, '办卡': 974}
+            url = 'https://www.douyu.com/japi/prop/donate/mainsite/v1'
+            header = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
+                      'content-type': 'application/x-www-form-urlencoded',
+                      'referer': 'https://www.douyu.com/%s' % item['rid']}
+
             i = item['prpn']
             if i not in prid:
                 pass
             else:
-                payload='propId=%s&propCount=1&roomId=%s&bizExt=\{"yzxq":\{\}\}'%(prid[i],item['rid'])
-                res = requests.post(url, payload, headers=header, cookies=self.__cookie_douyu).json()
-                if res['error']==0:
+                payload = 'propId=%s&propCount=1&roomId=%s&bizExt=\{"yzxq":\{\}\}' % (
+                    prid[i], item['rid'])
+                res = requests.post(
+                    url, payload, headers=header, cookies=self.__cookie_douyu).json()
+                if res['error'] == 0:
                     logger.success('{} 自动赠送成功！', i)
                     logger.log("HONGBAO", " {} {} {} {} 自动赠送成功！",
-                        item['time'], item['rid'], item['nn'], item['prpn'])
+                               item['time'], item['rid'], item['nn'], item['prpn'])
 
                 else:
                     logger.error('{} 自动赠送错误：{}', i, res['msg'])
@@ -153,12 +179,10 @@ class HongBao():
         finally:
             pass
 
-
-
-
     def updata(self, item):
         try:
-            acf_uid , acf_nickname = login_utils.get_uidAndname(self.__cookie_douyu)
+            acf_uid, acf_nickname = login_utils.get_uidAndname(
+                self.__cookie_douyu)
 
             baseheaders = {
                 'referer': 'https://www.obrua.com/dy_box',
@@ -176,7 +200,8 @@ class HongBao():
                     'stype': item['prpn'],
                     'count': item['pnum']
                 }
-                res = s.post(url, headers=baseheaders, data=None, json=paramjson)
+                res = s.post(url, headers=baseheaders,
+                             data=None, json=paramjson)
         except Exception as e:
             logger.exception('updata: {}'.format(e))
         finally:
@@ -189,6 +214,7 @@ class QiangHongBao():
         self.__done = False
         self.__cookie_douyu = cookie_douyu
         self.__qianglist = []
+        self.__followlist = []
         self.threadpool_doqiang = ThreadPoolExecutor(threadNum)
 
         self._init_run()
@@ -203,9 +229,25 @@ class QiangHongBao():
 
     def _init_run(self):
         """启动监控红包&红包结果监控线程"""
+        self.__followlist=self._get_followlist()
         qiang_hongbao = Thread(target=self._qiang_hongbao,
                                name="HongBao-qiang")
         qiang_hongbao.start()
+
+    def _get_followlist(self):
+        url='https://www.douyu.com/wgapi/livenc/liveweb/follow/list?sort=0&cid1=0'
+        __followlist=[]
+        try:
+            data=requests.get(url,cookies=self.__cookie_douyu).json()
+            #print(data)
+            if data['error']==0:
+                followlist=data['data']['list']
+                for item in followlist:
+                    __followlist.append(item['room_id'])
+                logger.info('获取关注列表成功 关注主播数量为{}个',len(__followlist))
+                return __followlist
+        except Exception as e:
+            logger.exception(f'get_followlist {e}')
 
     def _qiang_hongbao(self):
         while True:
@@ -255,11 +297,19 @@ class QiangHongBao():
                                 logger.info(f'抢红包成功')
                             if state == 0:
                                 logger.info(f'抢红包失败，红包已空')
+                            
+                            if state == -401:
+                                # 直接停止
+                                self.stop()
+
                             time.sleep(1)
                             # self.__stock_hongbao.remove(item['activityid'])
                             break
                     time.sleep(0.1)
-                self.quguan(roomid)
+                if roomid not in self.__followlist:
+                    self.quguan(roomid)
+                else:
+                    logger.info(f'已经关注，无需取关')
             else:
                 # print('条件：全部水友参与')
                 logger.info(f'条件为全部水友参与，无需关注')
@@ -299,6 +349,11 @@ class QiangHongBao():
             res = requests.post(url, data, headers=header,
                                 cookies=self.__cookie_douyu).json()
             # print(res)
+            if res['error']==1002:
+                logger.error(f'cookie过期 {res}')
+
+                return -401
+
             return res['data']['isSuc']
         except Exception as e:
             logger.exception(f'_grab_prp {e}')
@@ -340,7 +395,7 @@ class QiangHongBao():
             return 99
 
 
-def get_cookie():
+def get_cookie(flag=0):
     # 从文件获取cookie
     cookie_douyu = loginByQrcode.get_cookie_from_txt()
     if cookie_douyu and loginByQrcode.test_get_csrf_cookie(cookie_douyu):
@@ -348,11 +403,32 @@ def get_cookie():
         # 重新从文件取
         cookie_douyu = loginByQrcode.get_cookie_from_txt()
         return cookie_douyu
+    elif cookie_douyu and flag == 0:
+        if loginByQrcode.refresh_cookie(cookie_douyu):
+            logger.success('cookie更新成功.')
+            return get_cookie(flag=2)
+        else:
+            while not loginByQrcode.pc_qrcode_login():
+                logger.success('二维码登录失败, 重试.')
+            return get_cookie()
     else:
         # 二维码登录
-        while not loginByQrcode.pc_qrcode_login():
-            logger.success('二维码登录失败, 重试.')
-        return get_cookie()
+        if flag != 1:
+            while not loginByQrcode.pc_qrcode_login():
+                logger.success('二维码登录失败, 重试.')
+            return get_cookie()
+        else:
+            # flag=1时, 不执行登录
+            return None
+
+
+def update_cookie(cookie):
+    if loginByQrcode.refresh_cookie(cookie):
+        logger.success('cookie更新成功.')
+        return get_cookie(flag=1)
+    else:
+        return None
+
 
 def verControl():
 
@@ -370,21 +446,21 @@ def verControl():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.81 Safari/537.36'
     }
     redata = {}
+    bcontinue = True
     try:
         req = requests.get(url, headers=headers)
         redata = req.json()
         req.close
     finally:
-        pass
+        print('            获取版本号失败,请确保能正常上网')
+        bcontinue = False
 
-    bcontinue = True
     if 'qianghongbao' in redata:
         if version < redata['qianghongbao']:
             bcontinue = False
             print('                  最新版本: v{}'.format(redata['qianghongbao']))
             print('            请更新: https://www.obrua.com')
-            
+
     os.system("pause")
     if not bcontinue:
         sys.exit()
-

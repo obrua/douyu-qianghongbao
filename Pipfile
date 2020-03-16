@@ -15,6 +15,7 @@ requests = "*"
 pypng = "*"
 pillow = "*"
 qrcode = "*"
+ntplib = "*"
 
 [requires]
 python_version = "3.7"
