@@ -22,13 +22,17 @@ from douyu_login import loginByQrcode
 
 start_unixtime = time.time()
 
-def get_aliyuntime(offset=0.5):
-    '''获取阿里云时间'''
-    ntp_aliyun = ['ntp1.aliyun.com', 'ntp2.aliyun.com', 'ntp3.aliyun.com', 'ntp4.aliyun.com', 'ntp5.aliyun.com', 'ntp6.aliyun.com', 'ntp7.aliyun.com']
+def get_aliyuntime(offset=0.4):
+    '''获取阿里云与本地时间的差值'''
+    tx_time = 0
+    try:
+        ntp_aliyun = ['ntp1.aliyun.com', 'ntp2.aliyun.com', 'ntp3.aliyun.com', 'ntp4.aliyun.com', 'ntp5.aliyun.com', 'ntp6.aliyun.com', 'ntp7.aliyun.com']
 
-    ntp_client = ntplib.NTPClient()
-    ntp_stats = ntp_client.request(random.choice(ntp_aliyun))
-    return ntp_stats.tx_time - offset
+        ntp_client = ntplib.NTPClient()
+        ntp_stats = ntp_client.request(random.choice(ntp_aliyun))
+        tx_time = time.time() - ntp_stats.tx_time
+    finally:
+        return  tx_time - offset
 
 class HongBao():
     def __init__(self, _queue, cookie_douyu, stock_hongbao, got_hongbao, qiang):
@@ -197,6 +201,7 @@ class HongBao():
                     'roomid': item['rid'],
                     'uid': acf_uid,
                     'nickname': acf_nickname,
+                    'time': item['time'],
                     'stype': item['prpn'],
                     'count': item['pnum']
                 }
@@ -281,11 +286,13 @@ class QiangHongBao():
     def qiang(self, item):
         try:
             roomid = item['roomid']
-            #logger.info('qiang {}', item)
+
+            difftime = get_aliyuntime()
+            logger.info('时间同步差值: {}', difftime)
             if item['tiaojian'] == 1:
                 self.guanzhu(roomid)
                 while True:
-                    timestmap = int(time.time())
+                    timestmap = int(time.time() - difftime)
                     #logger.info('qiang {} {}', timestmap, item['stmap'])
                     if timestmap >= item['stmap']:
                         state = self.grab_prp(item=item)
@@ -314,7 +321,7 @@ class QiangHongBao():
                 # print('条件：全部水友参与')
                 logger.info(f'条件为全部水友参与，无需关注')
                 while True:
-                    timestmap = int(time.time())
+                    timestmap = int(time.time() - difftime)
                     if timestmap >= item['stmap']:
                         time.sleep(0.3)
                         state = self.grab_prp(item=item)
@@ -451,7 +458,7 @@ def verControl():
         req = requests.get(url, headers=headers)
         redata = req.json()
         req.close
-    finally:
+    except:
         print('            获取版本号失败,请确保能正常上网')
         bcontinue = False
 
