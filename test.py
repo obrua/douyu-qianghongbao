@@ -9,4 +9,7 @@ ntp_aliyun = ['ntp1.aliyun.com', 'ntp2.aliyun.com', 'ntp3.aliyun.com', 'ntp4.ali
 
 ntp_client = ntplib.NTPClient()
 ntp_stats = ntp_client.request(random.choice(ntp_aliyun))
-print(ntp_stats.tx_time)
+print(ntp_stats.tx_time,time.time())
+tx_time = ntp_stats.tx_time
+tx_time = time.time() - tx_time
+print(tx_time)
