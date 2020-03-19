@@ -80,9 +80,9 @@ if __name__ == '__main__':
             if not cookie_douyu:
                 logger.error('cookie续期失败, 请重启重新扫码登录')
                 break
-                time.sleep(5)
-
+            time.sleep(5)
             acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
+            logger.success(f'账号: {acf_nickname}({acf_uid})')
             isxuqi = True
 
 

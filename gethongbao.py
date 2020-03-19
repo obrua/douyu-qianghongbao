@@ -123,6 +123,7 @@ class HongBao():
         try:
             url = 'https://www.douyu.com/japi/interactnc/web/propredpacket/getPrpList?type_id=2&room_id=9999'
             _list = []
+            _fanslist=self.get_fanslist()
             res = requests.get(url)
             data = res.json()
             data = data['data']['list']
@@ -132,7 +133,7 @@ class HongBao():
                 datas['tiaojian'] = item['joinc']
                 datas['roomid'] = item['rid']
                 datas['activityid'] = item['activityid']
-                if item['joinc'] <= 1:
+                if item['joinc'] <= 1 or str(datas['roomid']) in _fanslist:
                     _list.append(datas)
 
             logger.debug(f'get_propredpacket {_list}')
@@ -154,6 +155,16 @@ class HongBao():
             return -1
         else:
             return 99
+
+    def get_fanslist(self):
+        try:
+            url='https://www.douyu.com/member/cp/getFansBadgeList'
+            res=requests.get(url,cookies=self.__cookie_douyu)
+            html=res.text
+            __list=re.findall('data-fans-room="(\d+?)"',html)
+            return __list 
+        except Exception as e:
+            logger.exception('fanslist: {}'.format(e))
 
     def songliwu(self, item):
         try:
