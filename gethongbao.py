@@ -110,6 +110,7 @@ class HongBao():
                     logger.log("HONGBAO", " {} {} {} {}",
                                item['time'], item['rid'], item['nn'], item['prpn'])
                     if Config.AUTO_SEND:
+                        time.sleep(5)
                         self.songliwu(item)
                     # print(item['rid'],item['nn'],item['prpn'])
         except Exception as e:

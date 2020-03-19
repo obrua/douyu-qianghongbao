@@ -8,7 +8,7 @@ import queue
 import time
 import threading
 from threading import Thread
-from gethongbao import verControl, HongBao, QiangHongBao, get_cookie
+from gethongbao import verControl, HongBao, QiangHongBao, get_cookie, update_cookie
 from basemodule.logger import logger
 from douyu_login import utils as login_utils
 from basemodule.config import Config, BASE_DIR
@@ -63,14 +63,37 @@ if __name__ == '__main__':
         for i in threading.enumerate():
             nowThreadsName.append(i.getName())  # 保存当前线程名称
 
-        if  'HongBao-do' not in nowThreadsName:
+        logger.info('检查内容: {} [{} {}] [{} {}]', nowThreadsName, 
+            hongbao_service, hongbao_service.get_done() if hongbao_service else 'none', 
+            qiang_service, qiang_service.get_done() if qiang_service else 'none')
+            
+        isxuqi = False
+        if hongbao_service and hongbao_service.get_overcookie():
+            logger.warning('cookie过期, 续期cookie并重启服务')
+            if hongbao_service:
+                hongbao_service.stop()
+            if qiang_service:
+                qiang_service.stop()
+
+            # 重新获取cookie
+            cookie_douyu = update_cookie(cookie_douyu)
+            if not cookie_douyu:
+                logger.error('cookie续期失败, 请重启重新扫码登录')
+                break
+                time.sleep(5)
+
+            acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
+            isxuqi = True
+
+
+        if not isxuqi and 'HongBao-do' not in nowThreadsName:
             logger.error('红包监控线程丢失')
             if hongbao_service:
                 hongbao_service.stop()
                 logger.error('停止服务 准备重启')
                 time.sleep(10)
 
-        if  'HongBao-qiang' not in nowThreadsName:
+        if not isxuqi and 'HongBao-qiang' not in nowThreadsName:
             logger.error('抢红包线程丢失')
             if qiang_service:
                 qiang_service.stop()
@@ -81,15 +104,6 @@ if __name__ == '__main__':
         if qiang_service and qiang_service.get_done():
             # 抢服务中断
             logger.warning('抢服务中断 重启')
-            if qiang_service.get_overcookie():
-                # 重新获取cookie
-                cookie_douyu = update_cookie()
-                if not cookie_douyu:
-                    logger.error('cookie续期失败, 请重启重新登录')
-                    break
-                    time.sleep(5)
-
-                acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
 
             qiang_service = None
             qiang_service = QiangHongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu, threadNum=6)
@@ -101,6 +115,7 @@ if __name__ == '__main__':
         if hongbao_service and hongbao_service.get_done():
             # 红包服务中断
             logger.warning('红包服务中断 重启')
+
             hongbao_service = None
             hongbao_service = HongBao(_queue=hongbao_queue, cookie_douyu=cookie_douyu,
                       stock_hongbao=stock_hongbao, got_hongbao=got_hongbao, qiang=qiang_service)
@@ -117,7 +132,7 @@ if __name__ == '__main__':
                 qiang_service.stop()
             break
 
-        for i in range(12*5):
+        for i in range(1):
             if bEXIT:
                 break
             time.sleep(5)

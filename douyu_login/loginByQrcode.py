@@ -259,3 +259,37 @@ def refresh_cookie(cookie):
     except Exception as e:
         logger.exception('续期cookie失败: {}'.format(e))
         return False
+
+def refresh_cookie_nosave(cookie):
+    # 续期cookie,不保存
+    try:
+        logger.info('续期cookie...')
+        baseheaders = {
+            'Referer':'https://www.douyu.com/directory/myFollow',
+            'x-requested-with': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36',
+        }
+
+        with requests.Session() as s:
+            url = 'https://passport.douyu.com/lapi/passport/iframe/safeAuth?client_id=1'
+
+            s.cookies.update(cookie)
+            res = s.get(url, headers=baseheaders)
+            tmp = res.text
+            tmp = tmp.strip('(')
+            tmp = tmp.strip(')')
+            res = json.loads(tmp)
+            
+            if res['error']==0 and res['msg']=='ok':
+                logger.success('续期cookie，成功！')
+                #save_cookie_to_txt(s)
+                return True
+            else:
+                logger.error(f'错误提示：{res}')
+                logger.error('续期cookie出错, 请更新查看错误提示，是否重新扫码登录!')
+                return False
+
+    except Exception as e:
+        logger.exception('续期cookie失败: {}'.format(e))
+        return False
