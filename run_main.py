@@ -132,7 +132,7 @@ if __name__ == '__main__':
                 qiang_service.stop()
             break
 
-        for i in range(1):
+        for i in range(12*5):
             if bEXIT:
                 break
             time.sleep(5)
