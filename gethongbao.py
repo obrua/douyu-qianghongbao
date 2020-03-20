@@ -301,7 +301,7 @@ class QiangHongBao():
 
             difftime = get_aliyuntime()
             logger.info('时间同步差值: {}', difftime)
-            if item['tiaojian'] == 1:
+            if item['tiaojian'] >= 1:
                 self.guanzhu(roomid)
                 while True:
                     timestmap = int(time.time() - difftime)
