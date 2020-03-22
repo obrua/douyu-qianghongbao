@@ -7,6 +7,7 @@ import json
 import queue
 import time
 import threading
+import ntplib
 from threading import Thread
 from gethongbao import verControl, HongBao, QiangHongBao, get_cookie, update_cookie
 from basemodule.logger import logger
@@ -80,9 +81,9 @@ if __name__ == '__main__':
             if not cookie_douyu:
                 logger.error('cookie续期失败, 请重启重新扫码登录')
                 break
-                time.sleep(5)
-
+            time.sleep(5)
             acf_uid , acf_nickname = login_utils.get_uidAndname(cookie_douyu)
+            logger.success(f'账号: {acf_nickname}({acf_uid})')
             isxuqi = True
 
 
@@ -132,7 +133,7 @@ if __name__ == '__main__':
                 qiang_service.stop()
             break
 
-        for i in range(1):
+        for i in range(12*5):
             if bEXIT:
                 break
             time.sleep(5)

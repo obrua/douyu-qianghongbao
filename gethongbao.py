@@ -123,6 +123,7 @@ class HongBao():
         try:
             url = 'https://www.douyu.com/japi/interactnc/web/propredpacket/getPrpList?type_id=2&room_id=9999'
             _list = []
+            _fanslist=self.get_fanslist()
             res = requests.get(url)
             data = res.json()
             data = data['data']['list']
@@ -132,7 +133,7 @@ class HongBao():
                 datas['tiaojian'] = item['joinc']
                 datas['roomid'] = item['rid']
                 datas['activityid'] = item['activityid']
-                if item['joinc'] <= 1:
+                if item['joinc'] <= 1 or str(datas['roomid']) in _fanslist:
                     _list.append(datas)
 
             logger.debug(f'get_propredpacket {_list}')
@@ -154,6 +155,16 @@ class HongBao():
             return -1
         else:
             return 99
+
+    def get_fanslist(self):
+        try:
+            url='https://www.douyu.com/member/cp/getFansBadgeList'
+            res=requests.get(url,cookies=self.__cookie_douyu)
+            html=res.text
+            __list=re.findall('data-fans-room="(\d+?)"',html)
+            return __list 
+        except Exception as e:
+            logger.exception('fanslist: {}'.format(e))
 
     def songliwu(self, item):
         try:
@@ -221,7 +232,7 @@ class QiangHongBao():
         self.__cookie_douyu = cookie_douyu
         self.__qianglist = []
         self.__followlist = []
-        self.threadpool_doqiang = ThreadPoolExecutor(threadNum)
+        self.threadpool_doqiang = ThreadPoolExecutor(threadNum, thread_name_prefix='qiang_')
 
         self._init_run()
 
@@ -255,6 +266,10 @@ class QiangHongBao():
         except Exception as e:
             logger.exception(f'get_followlist {e}')
 
+    def _qiang_call_back(self, futures):
+        response = futures.result()
+        logger.info("抢红包线程结束 {} {}", futures, response)
+
     def _qiang_hongbao(self):
         while True:
             _list = []
@@ -268,7 +283,8 @@ class QiangHongBao():
 
                 if it < 30:
                     logger.info("开启抢红包线程 {} {}", item, time.time())
-                    self.threadpool_doqiang.submit(self.qiang, item=item)
+                    f = self.threadpool_doqiang.submit(self.qiang, item=item)
+                    f.add_done_callback(self._qiang_call_back)
                 else:
                     logger.debug("还未开始 {} {}", item, time.time())
                     _list.append(item)
@@ -290,7 +306,7 @@ class QiangHongBao():
 
             difftime = get_aliyuntime()
             logger.info('时间同步差值: {}', difftime)
-            if item['tiaojian'] == 1:
+            if item['tiaojian'] >= 1:
                 self.guanzhu(roomid)
                 while True:
                     timestmap = int(time.time() - difftime)
@@ -340,9 +356,9 @@ class QiangHongBao():
 
         except Exception as e:
             logger.exception(f'qiang {e}')
-            return -1
+            return {'res':-1, 'stmap': item['stmap']}
         else:
-            return 99
+            return {'res':99, 'stmap': item['stmap']}
 
     def grab_prp(self, item):
         try:
@@ -440,7 +456,7 @@ def update_cookie(cookie):
 
 def verControl():
 
-    version = '1.0.1.0'
+    version = '1.0.2.0'
 
     print('=============================================================')
     print('            此工具由obrua.com提供 by 胖头鱼的机器人 && 小丑')
@@ -469,6 +485,6 @@ def verControl():
             print('                  最新版本: v{}'.format(redata['qianghongbao']))
             print('            请更新: https://www.obrua.com')
 
-    os.system("pause")
+    # os.system("pause")
     if not bcontinue:
         sys.exit()
