@@ -7,6 +7,7 @@ import json
 import queue
 import time
 import threading
+import ntplib
 from threading import Thread
 from gethongbao import verControl, HongBao, QiangHongBao, get_cookie, update_cookie
 from basemodule.logger import logger

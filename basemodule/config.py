@@ -23,4 +23,4 @@ class Config(object):
     LOGURU_LOGFILE = os.environ.get('LOGURU_LOGFILE') or 'logfile.log'
     
     #AUTO_SEND = os.environ.get('AUTO_SEND', 'false').lower() in ['true', 'on', '1']
-    AUTO_SEND = os.environ.get('AUTO_SEND', 'false').lower() not in ['false', 'off', '0']
+    AUTO_SEND = os.environ.get('AUTO_SEND', 'true').lower() not in ['false', 'off', '0']

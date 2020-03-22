@@ -456,7 +456,7 @@ def update_cookie(cookie):
 
 def verControl():
 
-    version = '1.0.1.0'
+    version = '1.0.2.0'
 
     print('=============================================================')
     print('            此工具由obrua.com提供 by 胖头鱼的机器人 && 小丑')
@@ -485,6 +485,6 @@ def verControl():
             print('                  最新版本: v{}'.format(redata['qianghongbao']))
             print('            请更新: https://www.obrua.com')
 
-    os.system("pause")
+    # os.system("pause")
     if not bcontinue:
         sys.exit()
