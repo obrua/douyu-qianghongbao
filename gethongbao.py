@@ -178,7 +178,7 @@ class HongBao():
             if i not in prid:
                 pass
             else:
-                payload = 'propId=%s&propCount=1&roomId=%s&bizExt=\{"yzxq":\{\}\}' % (
+                payload = 'propId=%s&propCount=1&roomId=%s&bizExt={"yzxq":{}}' % (
                     prid[i], item['rid'])
                 res = requests.post(
                     url, payload, headers=header, cookies=self.__cookie_douyu).json()
